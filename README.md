@@ -34,7 +34,7 @@ I try to break down each model both mathematically (continuous math) and impleme
 
 ### Model 1: Longitudinal Point Mass (1D)
 
-- [Detailed Analysis](https://yuk068.github.io/2026/03/03/car-physics-model1).
+[Detailed Analysis](https://yuk068.github.io/2026/03/03/car-physics-model1).
 
 ![model1-thumbnail](media/model1-thumbnail.webp)
 
