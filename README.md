@@ -32,6 +32,41 @@ I try to break down each model both mathematically (continuous math) and impleme
 
 ## Showcase
 
-- **Model 1: Longitudinal Point Mass (1D)** [Detailed Analysis](https://yuk068.github.io/2026/03/03/car-physics-model1).
+### Model 1: Longitudinal Point Mass (1D)
+
+- [Detailed Analysis](https://yuk068.github.io/2026/03/03/car-physics-model1).
 
 ![model1-thumbnail](media/model1-thumbnail.webp)
+
+**Controls**
+
+- **Space** – analog throttle (ramps 0 → 1 over 1s, adjustable)
+- **F** – binary brake
+- **Xbox Controller (optional)**
+  - **RT** – throttle
+  - **LT** – brake
+
+**Interface**
+
+- Side-view road with infinite scrolling environment
+- Meter markers every **25 m**
+- Car remains centered while the world scrolls
+- **Live dashboard graphs** (30-second rolling window)
+
+**Graph Modes**
+
+- **Full mode:** velocity, acceleration, position, engine force, drag, rolling resistance, braking
+- **Combined mode:** user-selectable normalized plots (0–1 scale)
+
+**Options**
+
+- Adjustable **physics timestep** (1 ms → 100 ms)
+- Adjustable **render FPS** (60 → 240, simulation unaffected)
+- **Control scheme selection**
+- **Reset Scenario panel** to modify physical constants and restart the simulation
+
+**Key constraint:** the car cannot move backward in this model.
+
+### Model 2: Load Transfer Without Traction Limits (1D)
+
+Coming soon.
