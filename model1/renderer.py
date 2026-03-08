@@ -119,8 +119,18 @@ def draw_road(surface, road_rect, road_y, screen_w, cam_x, font_sm):
         m += MARKER_INTERVAL
 
 
-def draw_car(surface, cx, wy, body_w, body_h, wheel_r):
-    """Draw a simple geometric car centred at (cx, wy)."""
+def draw_car(surface, cx, wy, body_w, body_h, wheel_r, true_form=False):
+    """Draw a simple geometric car centred at (cx, wy).
+
+    When true_form is True the cosmetic chassis is hidden and only the
+    point-mass (a red dot at the car's centre-of-mass height) is shown.
+    """
+    if true_form:
+        # Centre-of-mass position: mid-height of the body rectangle
+        dot_y = wy - wheel_r * 2 - body_h // 2
+        pygame.draw.circle(surface, (160, 0, 0),   (cx, dot_y), 9)   # dark halo
+        pygame.draw.circle(surface, (255, 50, 50), (cx, dot_y), 6)   # bright fill
+        return
     # Wheels
     wheel_xs = [cx - body_w // 2 + wheel_r + 8,
                 cx + body_w // 2 - wheel_r - 8]
@@ -155,10 +165,10 @@ def draw_car(surface, cx, wy, body_w, body_h, wheel_r):
                        (cx - body_w // 2 + 10, body_top + body_h // 2), 5)
 
 
-def draw_hud(surface, font_sm, font_lg, menu_btn,
+def draw_hud(surface, font_sm, font_lg, menu_btn, true_form_cb,
              fps_display, sim_time, car, throttle, brake,
              paused, horizon_y, screen_w):
-    """Draw the HUD: options button, FPS, telemetry stats, paused banner."""
+    """Draw the HUD: options button, True Form checkbox, FPS, telemetry stats, paused banner."""
     # Menu button
     hover = menu_btn.collidepoint(pygame.mouse.get_pos())
     pygame.draw.rect(surface, BTN_HOVER if hover else BTN_NORMAL,
@@ -166,6 +176,9 @@ def draw_hud(surface, font_sm, font_lg, menu_btn,
     pygame.draw.rect(surface, ACCENT, menu_btn, 1, border_radius=5)
     lbl = font_sm.render("Options", True, TEXT_BRIGHT)
     surface.blit(lbl, lbl.get_rect(center=menu_btn.center))
+
+    # True Form checkbox (immediately right of the Options button)
+    true_form_cb.draw(surface, font_sm)
 
     # FPS counter (top-right)
     fps_txt = font_sm.render(f"FPS: {fps_display:.0f}", True, TEXT_BRIGHT)

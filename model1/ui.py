@@ -272,6 +272,11 @@ class OptionsMenu:
         self._total_height = y + 10
         self._apply_dirty()
 
+    @property
+    def editing_active(self):
+        """True while a text input field inside the menu is being edited."""
+        return self._ramp_editing or self._const_editing is not None
+
     def toggle(self):
         self.visible = not self.visible
         if self.visible:

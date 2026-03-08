@@ -13,7 +13,7 @@ except ImportError:
 # Module-level handle set by load_xinput()
 _xinput_dll = None
 
-# We can remove XINPUT_BUTTON_B since we are mapping brakes to LT now
+XINPUT_BUTTON_START = 0x0010  # Xbox Start / Menu button
 
 
 def load_xinput():
@@ -60,7 +60,8 @@ def get_xinput_state(pad=0):
     """
     Poll XInput pad `pad`.
 
-    Returns (right_trigger_0_to_1, left_trigger_binary) or None if unavailable.
+    Returns (right_trigger_0_to_1, left_trigger_binary, start_button_bool)
+    or None if unavailable.
     """
     if _xinput_dll is None:
         return None
@@ -68,10 +69,9 @@ def get_xinput_state(pad=0):
     ret   = _xinput_dll.XInputGetState(pad, ctypes.byref(state))
     if ret != 0:
         return None
-        
-    rt = state.Gamepad.bRightTrigger / 255.0
-    
-    # Evaluate LT as binary: True if pressed past a small deadzone (10/255)
-    lt_binary = bool(state.Gamepad.bLeftTrigger > 10) 
-    
-    return rt, lt_binary
+
+    rt        = state.Gamepad.bRightTrigger / 255.0
+    lt_binary = bool(state.Gamepad.bLeftTrigger > 10)
+    start_btn = bool(state.Gamepad.wButtons & XINPUT_BUTTON_START)
+
+    return rt, lt_binary, start_btn

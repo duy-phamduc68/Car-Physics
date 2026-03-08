@@ -19,7 +19,7 @@ from physics   import CarModel, GraphBuffer
 from controls  import load_xinput, get_xinput_state
 from renderer  import (Cloud, draw_sky, draw_clouds, draw_road, draw_car,
                        draw_hud, draw_graph_full, draw_graph_combined)
-from ui        import OptionsMenu
+from ui        import OptionsMenu, CheckBox
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -53,6 +53,7 @@ class Simulator:
         self.control_mode      = "keyboard"
         self.throttle_ramp     = THROTTLE_RAMP_DEFAULT
         self.combined_channels = [True] * GraphBuffer.CHANNELS
+        self.true_form         = False
 
         # Physics state
         self.car       = CarModel()
@@ -67,6 +68,7 @@ class Simulator:
         self._f_held     = False
         self._xinput_ok  = load_xinput()
         self._joy        = None
+        self._start_prev = False   # XInput Start edge-detection
         self._init_joystick()
 
         # Clouds (stored in world-space x coordinates)
@@ -82,8 +84,10 @@ class Simulator:
         self._fps_acc     = 0.0
         self._fps_frames  = 0
 
-        # HUD menu button
-        self._menu_btn = pygame.Rect(8, 8, 110, 30)
+        # HUD menu button + True Form checkbox
+        self._menu_btn      = pygame.Rect(8, 8, 110, 30)
+        # Vertically centred with the 30-px menu button, 12 px gap to its right
+        self._true_form_cb  = CheckBox(130, 14, "True Form", checked=False)
 
         # Options overlay
         self.options = OptionsMenu(self)
@@ -178,6 +182,21 @@ class Simulator:
                 self._layout()
                 self.options._build()
 
+            # ESC toggles the options menu (unless a text field is being edited)
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                if not self.options.editing_active:
+                    self.options.toggle()
+                    continue
+
+            # True Form checkbox – always track hover; block clicks when options open
+            if event.type == pygame.MOUSEMOTION:
+                self._true_form_cb.handle_event(event)
+            if (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
+                    and not self.options.visible):
+                if self._true_form_cb.handle_event(event):
+                    self.true_form = self._true_form_cb.checked
+                    continue
+
             if self.options.handle_event(event):
                 continue
 
@@ -213,7 +232,7 @@ class Simulator:
         elif self.control_mode == "controller":
             xi = get_xinput_state(0)
             if xi is not None:
-                rt, b_btn     = xi
+                rt, b_btn, _  = xi   # start_btn handled by _poll_start_button
                 self.throttle = rt
                 self.brake    = 1 if b_btn else 0
             elif self._joy is not None:
@@ -223,6 +242,23 @@ class Simulator:
                     self.brake    = 1 if self._joy.get_button(1) else 0
                 except Exception:
                     pass
+
+    # ── controller menu shortcut ──────────────────────────────────────────────
+
+    def _poll_start_button(self):
+        """Toggle options when Xbox Start is newly pressed (edge-detect)."""
+        if not self._xinput_ok or self.control_mode != "controller":
+            self._start_prev = False
+            return
+        xi = get_xinput_state(0)
+        if xi is None:
+            self._start_prev = False
+            return
+        _, _, start_btn = xi
+        if start_btn and not self._start_prev:
+            if not self.options.editing_active:
+                self.options.toggle()
+        self._start_prev = start_btn
 
     # ── physics ───────────────────────────────────────────────────────────────
 
@@ -250,11 +286,12 @@ class Simulator:
     def _draw_car(self):
         draw_car(self.screen,
                  self.car_cx, self.car_wy,
-                 self.car_body_w, self.car_body_h, self.car_wheel_r)
+                 self.car_body_w, self.car_body_h, self.car_wheel_r,
+                 self.true_form)
 
     def _draw_hud(self):
         draw_hud(self.screen, self.font_sm, self.font_lg,
-                 self._menu_btn, self._fps_display,
+                 self._menu_btn, self._true_form_cb, self._fps_display,
                  self.sim_time, self.car,
                  self.throttle, self.brake,
                  self.paused, self.horizon_y, self.screen_w)
@@ -292,6 +329,7 @@ class Simulator:
                 self._layout()
 
             running     = self._handle_events()
+            self._poll_start_button()
             self.paused = self.options.visible
 
             if not self.paused:
