@@ -30,6 +30,15 @@ I try to break down each model both mathematically (continuous math) and impleme
 - [ ] Model 8: Full Coupled Tire Model (2D)
 ```
 
+- [Model 1: Longitudinal Point Mass (1D)](#model-1-longitudinal-point-mass-1d)
+- [Model 2: Load Transfer Without Traction Limits (1D)](#model-2-load-transfer-without-traction-limits-1d)
+- [Model 3: Engine Torque + Gearing without Slip (1D)]
+- [Model 4: Wheel Rotational Dynamics (1D)]
+- [Model 5: Slip Ratio + Traction Curve (1D)]
+- [Model 6: Low-Speed Kinematic Turning (2D)]
+- [Model 7: High-Speed Lateral Tire Model (2D)]
+- [Model 8: Full Coupled Tire Model (2D)]
+
 ## Showcase
 
 ### Model 1: Longitudinal Point Mass (1D)
