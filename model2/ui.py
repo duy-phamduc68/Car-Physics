@@ -10,7 +10,7 @@ from constants import (
     BTN_NORMAL, BTN_HOVER, BTN_ACTIVE,
     GRAPH_GRID, GRAPH_LABELS,
     PANEL_BG,
-    TIMESTEP_OPTIONS, FPS_OPTIONS, CONST_FIELDS,
+    TIMESTEP_OPTIONS, FPS_OPTIONS, CONST_FIELDS, PARAM_LIMITS,
 )
 
 
@@ -32,10 +32,14 @@ def _fmt_const(val):
     return f"{val:g}"
 
 
-def _const_valid(txt):
-    """Return True if txt parses as a float greater than zero."""
+def _const_valid(txt, attr=None):
+    """Return True if txt parses to a valid float, with optional range checks."""
     try:
-        return float(txt) > 0
+        val = float(txt)
+        if attr in PARAM_LIMITS:
+            lo, hi = PARAM_LIMITS[attr]
+            return lo <= val <= hi
+        return val > 0
     except (ValueError, TypeError):
         return False
 
@@ -156,37 +160,85 @@ class OptionsMenu:
         # Track pending constant edits  {attr: text_string}
         self._const_texts   = {f[1]: _fmt_const(f[3]) for f in CONST_FIELDS}
         self._const_editing = None
-        self._const_dirty   = False
         self._build()
+        self._sync_const_texts()
 
     # ── internal helpers ──────────────────────────────────────────────────────
 
-    def _all_non_reset_btns(self):
-        """Yield every button that must be grayed-out when constants are dirty."""
-        for _, btn in self._ts_buttons:
-            yield btn
-        for _, btn in self._fps_buttons:
-            yield btn
-        yield self._btn_full
-        yield self._btn_comb
-        yield self._btn_kb
-        yield self._btn_ctrl
-        yield self._btn_close
-
-    def _apply_dirty(self):
-        for btn in self._all_non_reset_btns():
-            btn.disabled = self._const_dirty
-
-    def _is_const_dirty(self):
-        s = self.sim
+    def _sync_const_texts(self):
         for _name, attr, _unit, _default in CONST_FIELDS:
-            try:
-                val = float(self._const_texts.get(attr, ""))
-                if val > 0 and abs(val - getattr(s.car, attr)) > 1e-9:
-                    return True
-            except ValueError:
-                pass
-        return False
+            self._const_texts[attr] = _fmt_const(getattr(self.sim.car, attr))
+
+    def _clamp_value(self, attr, val):
+        if attr in PARAM_LIMITS:
+            lo, hi = PARAM_LIMITS[attr]
+            return max(lo, min(hi, val))
+        return max(0.0001, val)
+
+    def _set_constant_and_apply(self, attr, raw_val):
+        s = self.sim
+        car = s.car
+
+        if not hasattr(car, attr):
+            return False
+
+        val = self._clamp_value(attr, raw_val)
+        changed = False
+
+        if attr in ("b", "c", "L"):
+            b_val = car.b
+            c_val = car.c
+            l_val = car.L
+
+            if attr == "b":
+                b_val = self._clamp_value("b", val)
+                target_l = self._clamp_value("L", b_val + c_val)
+                c_val = target_l - b_val
+                c_val = self._clamp_value("c", c_val)
+                b_val = target_l - c_val
+            elif attr == "c":
+                c_val = self._clamp_value("c", val)
+                target_l = self._clamp_value("L", b_val + c_val)
+                b_val = target_l - c_val
+                b_val = self._clamp_value("b", b_val)
+                c_val = target_l - b_val
+            else:
+                l_val = self._clamp_value("L", val)
+                b_val = self._clamp_value("b", b_val)
+                c_val = l_val - b_val
+                if c_val < PARAM_LIMITS["c"][0]:
+                    c_val = PARAM_LIMITS["c"][0]
+                    b_val = l_val - c_val
+                if c_val > PARAM_LIMITS["c"][1]:
+                    c_val = PARAM_LIMITS["c"][1]
+                    b_val = l_val - c_val
+                b_val = self._clamp_value("b", b_val)
+                c_val = l_val - b_val
+
+            b_val = self._clamp_value("b", b_val)
+            c_val = self._clamp_value("c", c_val)
+            l_val = b_val + c_val
+            l_val = self._clamp_value("L", l_val)
+
+            if abs(car.b - b_val) > 1e-9:
+                car.b = b_val
+                changed = True
+            if abs(car.c - c_val) > 1e-9:
+                car.c = c_val
+                changed = True
+            if abs(car.L - l_val) > 1e-9:
+                car.L = l_val
+                changed = True
+        else:
+            current = getattr(car, attr)
+            if abs(current - val) > 1e-9:
+                setattr(car, attr, val)
+                changed = True
+
+        if changed:
+            self._sync_const_texts()
+            s.reset_scenario()
+        return changed
 
     # ── build widget layout ───────────────────────────────────────────────────
 
@@ -238,13 +290,6 @@ class OptionsMenu:
         self._ramp_text    = str(s.throttle_ramp)
         y += R + G + SG
 
-        # Control mode
-        self._btn_kb   = Button((px + 10,  y, 160, R), "Keyboard",
-                                toggle=True, active=(s.control_mode == "keyboard"))
-        self._btn_ctrl = Button((px + 180, y, 200, R), "Xbox Controller",
-                                toggle=True, active=(s.control_mode == "controller"))
-        y += R + G + SG
-
         # Divider
         self._divider_y = y
         y += 2 + SG
@@ -257,20 +302,27 @@ class OptionsMenu:
         for i, (_name, attr, _unit, _default) in enumerate(CONST_FIELDS):
             iy = y + i * field_row_h
             self._const_rects[attr] = pygame.Rect(
-                px + 10 + col_label_w + 8, iy, col_input_w, R)
+                px + pw - col_input_w - 64, iy, col_input_w, R)
         y += len(CONST_FIELDS) * field_row_h + G
 
         # Reset Scenario button
         self._btn_reset = Button(
             (px + pw // 2 - 100, y, 200, R + 4), "Reset Scenario")
-        y += R + 4 + G + SG
+        y += R + 4 + G
+
+        # Controls guide
+        self._tooltip_y = y
+        
+        tooltip_lines = 3
+        line_h = 20
+        
+        y += 20 + tooltip_lines * line_h + 10
 
         # Close button
         self._btn_close = Button((px + pw // 2 - 60, y, 120, R), "Close")
         y += R + 14
 
         self._total_height = y + 10
-        self._apply_dirty()
 
     @property
     def editing_active(self):
@@ -282,6 +334,7 @@ class OptionsMenu:
         if self.visible:
             self.scroll_y = 0
             self._build()
+            self._sync_const_texts()
 
     # ── event handling ────────────────────────────────────────────────────────
 
@@ -308,70 +361,46 @@ class OptionsMenu:
                 self.scroll_y  = max(0, min(self.scroll_y, max_scroll))
                 return True
 
-        # Reset Scenario (always active, applies pending constants)
+        # Reset Scenario
         if self._btn_reset.handle_event(event, mapped_pos):
-            if self._const_dirty:
-                for _name, attr, _unit, _default in CONST_FIELDS:
-                    txt = self._const_texts.get(attr, "")
-                    try:
-                        val = float(txt)
-                        if val > 0:
-                            setattr(s.car, attr, val)
-                    except ValueError:
-                        pass
-                self._const_dirty = False
-                self._apply_dirty()
             s.reset_scenario()
             return True
 
-        # All other buttons are blocked while constants are dirty
-        if not self._const_dirty:
-            for dt, btn in self._ts_buttons:
-                if btn.handle_event(event, mapped_pos):
-                    for dt2, b2 in self._ts_buttons:
-                        b2.active = (dt2 == dt)
-                    if dt != s.dt:
-                        s.dt = dt
-                        s.reset_scenario()
-                    return True
-
-            for fps, btn in self._fps_buttons:
-                if btn.handle_event(event, mapped_pos):
-                    for fps2, b2 in self._fps_buttons:
-                        b2.active = (fps2 == fps)
-                    s.target_fps = fps
-                    return True
-
-            if self._btn_full.handle_event(event, mapped_pos):
-                s.graph_mode          = "full"
-                self._btn_full.active = True
-                self._btn_comb.active = False
-                return True
-            if self._btn_comb.handle_event(event, mapped_pos):
-                s.graph_mode          = "combined"
-                self._btn_full.active = False
-                self._btn_comb.active = True
+        for dt, btn in self._ts_buttons:
+            if btn.handle_event(event, mapped_pos):
+                for dt2, b2 in self._ts_buttons:
+                    b2.active = (dt2 == dt)
+                if dt != s.dt:
+                    s.dt = dt
+                    s.reset_scenario()
                 return True
 
-            for i, cb in enumerate(self._comb_checks):
-                if cb.handle_event(event, mapped_pos):
-                    s.combined_channels[i] = cb.checked
-                    return True
-
-            if self._btn_kb.handle_event(event, mapped_pos):
-                s.control_mode        = "keyboard"
-                self._btn_kb.active   = True
-                self._btn_ctrl.active = False
-                return True
-            if self._btn_ctrl.handle_event(event, mapped_pos):
-                s.control_mode        = "controller"
-                self._btn_kb.active   = False
-                self._btn_ctrl.active = True
+        for fps, btn in self._fps_buttons:
+            if btn.handle_event(event, mapped_pos):
+                for fps2, b2 in self._fps_buttons:
+                    b2.active = (fps2 == fps)
+                s.target_fps = fps
                 return True
 
-            if self._btn_close.handle_event(event, mapped_pos):
-                self.visible = False
+        if self._btn_full.handle_event(event, mapped_pos):
+            s.graph_mode          = "full"
+            self._btn_full.active = True
+            self._btn_comb.active = False
+            return True
+        if self._btn_comb.handle_event(event, mapped_pos):
+            s.graph_mode          = "combined"
+            self._btn_full.active = False
+            self._btn_comb.active = True
+            return True
+
+        for i, cb in enumerate(self._comb_checks):
+            if cb.handle_event(event, mapped_pos):
+                s.combined_channels[i] = cb.checked
                 return True
+
+        if self._btn_close.handle_event(event, mapped_pos):
+            self.visible = False
+            return True
 
         # Constants input boxes (always interactive)
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -428,8 +457,10 @@ class OptionsMenu:
             else:
                 if len(cur) < 12:
                     self._const_texts[attr] = cur + event.unicode
-            self._const_dirty = self._is_const_dirty()
-            self._apply_dirty()
+
+            txt_now = self._const_texts.get(attr, "")
+            if _const_valid(txt_now, attr):
+                self._set_constant_and_apply(attr, float(txt_now))
             return True
 
         return True  # swallow all events while the menu is open
@@ -507,12 +538,6 @@ class OptionsMenu:
         content.blit(rt, (self._ramp_rect.x + 8, self._ramp_rect.y + 8))
         y += R + G + SG
 
-        # Control mode
-        _sec_label(content, font_sm, "Control Mode", px + 10, y - 16)
-        self._btn_kb.draw(content, font_sm)
-        self._btn_ctrl.draw(content, font_sm)
-        y += R + G + SG
-
         # Divider
         pygame.draw.line(content, GRAPH_GRID,
                          (px + 10, self._divider_y),
@@ -520,23 +545,25 @@ class OptionsMenu:
         y = self._divider_y + 2 + SG
 
         # Physics constants
-        warn_col = (255, 180, 50)
-        sec_txt  = "Physics Constants"
-        if self._const_dirty:
-            sec_txt += "pending - press Reset Scenario to apply"
-        _sec_label(content, font_sm, sec_txt, px + 10, y - 16,
-                   color=warn_col if self._const_dirty else TEXT_DIM)
+        _sec_label(content, font_sm, "Physics Constants (live apply)",
+                   px + 10, y - 16)
 
         field_row_h = R + G
         for i, (name, attr, unit, _default) in enumerate(CONST_FIELDS):
             iy  = y + i * field_row_h
-            lbl = font_sm.render(f"{name}  [{unit}]", True, TEXT_DIM)
+            if attr in PARAM_LIMITS:
+                lo, hi = PARAM_LIMITS[attr]
+                label_text = f"{name}  [{unit}]  ({lo}-{hi})"
+            else:
+                label_text = f"{name}  [{unit}]"
+
+            lbl = font_sm.render(label_text, True, TEXT_DIM)
             content.blit(lbl, (px + 10, iy + 8))
 
             rect      = self._const_rects[attr]
             is_active = (self._const_editing == attr)
             txt_str   = self._const_texts.get(attr, "")
-            valid     = _const_valid(txt_str)
+            valid     = _const_valid(txt_str, attr)
 
             if is_active:
                 box_col    = (30, 40, 60)
@@ -544,10 +571,6 @@ class OptionsMenu:
             elif not valid:
                 box_col    = (55, 20, 20)
                 border_col = (200, 60, 60)
-            elif self._const_dirty and abs(
-                    float(txt_str) - getattr(s.car, attr)) > 1e-9:
-                box_col    = (40, 35, 15)
-                border_col = warn_col
             else:
                 box_col    = BTN_NORMAL
                 border_col = GRAPH_AXIS
@@ -564,6 +587,18 @@ class OptionsMenu:
 
         # Reset Scenario / Close
         self._btn_reset.draw(content, font_md)
+
+        # Controls Guide
+        _sec_label(content, font_sm, "Controls Guide", content.get_width() / 2 - 50, self._tooltip_y - 10)
+        tooltip_text = [
+            "Input source auto-detect: keyboard or controller",
+            "Keyboard: space for throttle, f for brake",
+            "xbox: rt for throttle, lt for brake (still binary)",
+        ]
+        for i, line in enumerate(tooltip_text):
+            lbl = font_sm.render(line, True, TEXT_DIM)
+            content.blit(lbl, lbl.get_rect(center=(content.get_width() / 2, self._tooltip_y + 15 + i * 20)))
+
         self._btn_close.draw(content, font_sm)
 
         # Blit the scrolled slice of the content surface

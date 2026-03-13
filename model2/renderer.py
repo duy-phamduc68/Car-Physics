@@ -119,51 +119,234 @@ def draw_road(surface, road_rect, road_y, screen_w, cam_x, font_sm):
         m += MARKER_INTERVAL
 
 
-def draw_car(surface, cx, wy, body_w, body_h, wheel_r, true_form=False):
+def _clamp(value, lo, hi):
+    return max(lo, min(hi, value))
+
+
+def _mix_color(c0, c1, t):
+    t = _clamp(t, 0.0, 1.0)
+    return (
+        int(c0[0] + (c1[0] - c0[0]) * t),
+        int(c0[1] + (c1[1] - c0[1]) * t),
+        int(c0[2] + (c1[2] - c0[2]) * t),
+    )
+
+
+def _load_color(load, static_load):
+    if static_load <= 1e-6:
+        return (255, 255, 255)
+    if load >= static_load:
+        t = (load - static_load) / (0.45 * static_load)
+        return _mix_color((255, 255, 255), (255, 70, 70), t)
+    t = (static_load - load) / (0.45 * static_load)
+    return _mix_color((255, 255, 255), (80, 220, 80), t)
+
+
+def _draw_vertical_arrow(surface, x, y_base, length, color):
+    tip_y = int(y_base - length)
+    pygame.draw.line(surface, color, (x, y_base), (x, tip_y), 3)
+    pygame.draw.polygon(surface, color, [
+        (x, tip_y - 8),
+        (x - 7, tip_y + 6),
+        (x + 7, tip_y + 6),
+    ])
+
+
+def _draw_transfer_bar(surface, center_x, y, width, height, dW, W, font_sm):
+    bar_rect = pygame.Rect(center_x - width // 2, y, width, height)
+    pygame.draw.rect(surface, (24, 24, 34), bar_rect, border_radius=6)
+    pygame.draw.rect(surface, (170, 170, 180), bar_rect, 1, border_radius=6)
+
+    center_x_px = bar_rect.centerx
+    max_shift = (width // 2) - 8
+    ratio = 0.0 if W <= 1e-6 else _clamp(dW / W, -0.20, 0.20)
+    shift = int((ratio / 0.20) * max_shift) if max_shift > 0 else 0
+
+    if shift > 0:
+        fill = pygame.Rect(center_x_px, y + 2, shift, height - 4)
+        pygame.draw.rect(surface, _mix_color((255, 190, 190), (255, 70, 70), shift / max_shift), fill)
+    elif shift < 0:
+        fill = pygame.Rect(center_x_px + shift, y + 2, -shift, height - 4)
+        pygame.draw.rect(surface, _mix_color((190, 210, 255), (70, 130, 255), -shift / max_shift), fill)
+
+    pygame.draw.line(surface, (230, 230, 235), (center_x_px, y - 3), (center_x_px, y + height + 3), 2)
+    pygame.draw.line(surface, (255, 255, 255), (center_x_px + shift, y - 4), (center_x_px + shift, y + height + 4), 2)
+
+    title = font_sm.render("[ Front Transfer ] | [ Rear Transfer ]", True, (225, 225, 235))
+    surface.blit(title, title.get_rect(center=(center_x, y - 14)))
+
+    pct = 0.0 if W <= 1e-6 else (dW / W) * 100.0
+    if pct > 0:
+        msg = f"+{pct:.1f}% rear transfer"
+        col = (255, 110, 110)
+    elif pct < 0:
+        msg = f"{pct:.1f}% front transfer"
+        col = (110, 160, 255)
+    else:
+        msg = "0.0% transfer"
+        col = (245, 245, 245)
+    lbl = font_sm.render(msg, True, col)
+    surface.blit(lbl, lbl.get_rect(center=(center_x, y + height + 12)))
+
+
+def draw_car(surface, cx, wy, body_w, body_h, wheel_r,
+             true_form=False, car=None, font_sm=None, road_bottom_y=None):
     """Draw a simple geometric car centred at (cx, wy).
 
-    When true_form is True the cosmetic chassis is hidden and only the
-    point-mass (a red dot at the car's centre-of-mass height) is shown.
+    When true_form is True draw a rigid-body load transfer diagram using
+    wheelbase/CG geometry from the physics model.
     """
-    if true_form:
-        # Centre-of-mass position: mid-height of the body rectangle
-        dot_y = wy - wheel_r * 2 - body_h // 2
-        pygame.draw.circle(surface, (160, 0, 0),   (cx, dot_y), 9)   # dark halo
-        pygame.draw.circle(surface, (255, 50, 50), (cx, dot_y), 6)   # bright fill
+    if car is None:
         return
-    # Wheels
-    wheel_xs = [cx - body_w // 2 + wheel_r + 8,
-                cx + body_w // 2 - wheel_r - 8]
-    wheel_y  = wy - wheel_r
-    for wx in wheel_xs:
-        pygame.draw.circle(surface, CAR_WHEEL,     (wx, wheel_y), wheel_r)
-        pygame.draw.circle(surface, CAR_WHEEL_RIM, (wx, wheel_y), wheel_r // 3)
 
-    # Body
-    body_top  = wy - wheel_r * 2 - body_h
-    body_rect = pygame.Rect(cx - body_w // 2, body_top, body_w, body_h)
-    pygame.draw.rect(surface, CAR_BODY, body_rect, border_radius=8)
+    font_sm = font_sm or pygame.font.SysFont("Consolas", 13)
 
-    # Roof / cabin
-    roof_w    = int(body_w * 0.55)
-    roof_h    = int(body_h * 0.70)
-    roof_rect = pygame.Rect(cx - roof_w // 2, body_top - roof_h, roof_w, roof_h)
-    pygame.draw.rect(surface, CAR_ROOF, roof_rect, border_radius=6)
+    def _bar_y(default_y):
+        if road_bottom_y is None:
+            return default_y
+        return int(road_bottom_y - 36)
 
-    # Window
-    win_margin = 6
-    win_rect   = pygame.Rect(roof_rect.x + win_margin,
-                             roof_rect.y + win_margin,
-                             roof_w - 2 * win_margin,
-                             roof_h - 2 * win_margin)
+    if true_form:
+        axle_y = wy - wheel_r
+        wheelbase_px = max(160, int(car.L * PIXELS_PER_METER))
+        rear_x = int(cx - wheelbase_px / 2)
+        front_x = int(cx + wheelbase_px / 2)
+        cg_ratio = 0.5 if car.L <= 1e-6 else _clamp(car.c / car.L, 0.0, 1.0)
+        cg_x = int(rear_x + wheelbase_px * cg_ratio)
+        cg_y = int(axle_y - car.h * PIXELS_PER_METER)
+
+        pygame.draw.line(surface, (220, 220, 220), (front_x, axle_y), (rear_x, axle_y), 3)
+
+        for wx in (front_x, rear_x):
+            pygame.draw.circle(surface, (240, 240, 245), (wx, axle_y), wheel_r, 2)
+            pygame.draw.circle(surface, (80, 80, 88), (wx, axle_y), max(3, wheel_r // 5))
+
+        body_y = axle_y - 46
+        pygame.draw.line(surface, (200, 200, 205), (front_x, body_y), (rear_x, body_y), 4)
+        pygame.draw.line(surface, (180, 180, 190), (cg_x, axle_y), (cg_x, cg_y), 2)
+        pygame.draw.circle(surface, (255, 245, 120), (cg_x, cg_y), 6)
+
+        _draw_vertical_arrow(surface, cg_x, cg_y + 2, 46, (245, 245, 245))
+        w_lbl = font_sm.render("W = M g", True, (235, 235, 240))
+        surface.blit(w_lbl, (cg_x + 10, cg_y - 52))
+
+        mid_y = int((axle_y + cg_y) / 2)
+        pygame.draw.line(surface, (140, 160, 200), (cg_x + 24, axle_y), (cg_x + 24, cg_y), 1)
+        h_lbl = font_sm.render(f"h={car.h:.2f}m", True, (150, 175, 220))
+        surface.blit(h_lbl, (cg_x + 28, mid_y - 8))
+
+        dim_y = axle_y + 34
+        pygame.draw.line(surface, (145, 145, 155), (front_x, dim_y), (rear_x, dim_y), 1)
+        l_lbl = font_sm.render(f"L={car.L:.2f}m", True, (210, 210, 220))
+        surface.blit(l_lbl, l_lbl.get_rect(center=(cx, dim_y + 10)))
+
+        top_dim_y = axle_y - 20
+        pygame.draw.line(surface, (145, 145, 155), (rear_x, top_dim_y), (cg_x, top_dim_y), 1)
+        pygame.draw.line(surface, (145, 145, 155), (cg_x, top_dim_y), (front_x, top_dim_y), 1)
+
+        b_lbl = font_sm.render(f"b={car.b:.2f}", True, (200, 200, 210))
+        c_lbl = font_sm.render(f"c={car.c:.2f}", True, (200, 200, 210))
+
+        surface.blit(c_lbl, c_lbl.get_rect(center=((rear_x + cg_x) // 2, top_dim_y - 10)))
+        surface.blit(b_lbl, b_lbl.get_rect(center=((cg_x + front_x) // 2, top_dim_y - 10)))
+
+        wf_len = _clamp(20 + (car.Wf / max(car.Wf_static, 1.0)) * 38, 14, 92)
+        wr_len = _clamp(20 + (car.Wr / max(car.Wr_static, 1.0)) * 38, 14, 92)
+
+        wf_col = _load_color(car.Wf, car.Wf_static)
+        wr_col = _load_color(car.Wr, car.Wr_static)
+
+        _draw_vertical_arrow(surface, front_x, axle_y - 2, wf_len, wf_col)
+        _draw_vertical_arrow(surface, rear_x, axle_y - 2, wr_len, wr_col)
+
+        wf_lbl = font_sm.render(f"Wf={car.Wf:.0f}N", True, wf_col)
+        wr_lbl = font_sm.render(f"Wr={car.Wr:.0f}N", True, wr_col)
+
+        surface.blit(wf_lbl, wf_lbl.get_rect(center=(front_x, axle_y + wheel_r + 16)))
+        surface.blit(wr_lbl, wr_lbl.get_rect(center=(rear_x, axle_y + wheel_r + 16)))
+
+        _draw_transfer_bar(surface, cx, _bar_y(axle_y + wheel_r + 44), 260, 16,
+                           car.dW, car.W, font_sm)
+        return
+
+    # --- simplified sprite mode ---
+
+    axle_y = wy - wheel_r
+    wheelbase_px = max(140, int(car.L * PIXELS_PER_METER))
+
+    rear_x = int(cx - wheelbase_px / 2)
+    front_x = int(cx + wheelbase_px / 2)
+
+    cg_ratio = 0.5 if car.L <= 1e-6 else _clamp(car.c / car.L, 0.0, 1.0)
+    cg_x = int(rear_x + wheelbase_px * cg_ratio)
+    cg_y = int(axle_y - car.h * PIXELS_PER_METER)
+
+    body_bottom = int(axle_y - wheel_r + 18)
+    body_top = int(body_bottom - max(32, 0.20 * wheelbase_px))
+
+    x0 = rear_x - 6
+    x1 = rear_x + int(0.20 * wheelbase_px)
+    x2 = rear_x + int(0.42 * wheelbase_px)
+    x3 = rear_x + int(0.65 * wheelbase_px)
+    x4 = front_x - int(0.14 * wheelbase_px)
+    x5 = front_x + 6
+
+    y0 = body_bottom
+    y1 = body_top + 14
+    y2 = body_top
+    y3 = body_top
+    y4 = body_top + 18
+
+    car_shape = [
+        (x0, y0),
+        (x0, y1),
+        (x1, y2),
+        (x3, y3),
+        (x4, y4),
+        (x5, y4),
+        (x5, y0),
+    ]
+
+    pygame.draw.polygon(surface, CAR_BODY, car_shape)
+
+    # window
+    win_w = int((x5 - x0) * 0.28)
+    win_h = int((y0 - y2) * 0.35)
+
+    win_rect = pygame.Rect(
+        cx - win_w // 2,
+        y2 + 6,
+        win_w,
+        win_h
+    )
+
     pygame.draw.rect(surface, CAR_WINDOW, win_rect, border_radius=4)
 
-    # Headlight and taillight
-    pygame.draw.circle(surface, (255, 240, 180),
-                       (cx + body_w // 2 - 10, body_top + body_h // 2), 6)
-    pygame.draw.circle(surface, (255, 60, 60),
-                       (cx - body_w // 2 + 10, body_top + body_h // 2), 5)
+    # wheels
+    for wx in (rear_x, front_x):
+        pygame.draw.circle(surface, CAR_WHEEL, (wx, axle_y), wheel_r)
+        pygame.draw.circle(surface, CAR_WHEEL_RIM, (wx, axle_y), wheel_r // 3)
 
+    pygame.draw.line(surface, (220, 220, 225), (rear_x, axle_y), (front_x, axle_y), 2)
+    # pygame.draw.circle(surface, (255, 245, 120), (cg_x, cg_y), 5)
+
+    wf_len = _clamp(16 + (car.Wf / max(car.Wf_static, 1.0)) * 24, 12, 56)
+    wr_len = _clamp(16 + (car.Wr / max(car.Wr_static, 1.0)) * 24, 12, 56)
+
+    wf_col = _load_color(car.Wf, car.Wf_static)
+    wr_col = _load_color(car.Wr, car.Wr_static)
+
+    _draw_vertical_arrow(surface, front_x, axle_y - wheel_r - 4, wf_len, wf_col)
+    _draw_vertical_arrow(surface, rear_x, axle_y - wheel_r - 4, wr_len, wr_col)
+
+    wf_lbl = font_sm.render(f"Wf={car.Wf:.0f}", True, wf_col)
+    wr_lbl = font_sm.render(f"Wr={car.Wr:.0f}", True, wr_col)
+
+    surface.blit(wf_lbl, wf_lbl.get_rect(center=(front_x, axle_y + wheel_r + 14)))
+    surface.blit(wr_lbl, wr_lbl.get_rect(center=(rear_x, axle_y + wheel_r + 14)))
+
+    _draw_transfer_bar(surface, cx, _bar_y(axle_y + wheel_r + 44), 220, 14,
+                       car.dW, car.W, font_sm)
 
 def draw_hud(surface, font_sm, font_lg, menu_btn, true_form_cb,
              fps_display, sim_time, car, throttle, brake,

@@ -263,7 +263,11 @@ class OptionsMenu:
         # Reset Scenario button
         self._btn_reset = Button(
             (px + pw // 2 - 100, y, 200, R + 4), "Reset Scenario")
-        y += R + 4 + G + SG
+        y += R + 4 + G
+
+        # Controls guide
+        self._tooltip_y = y
+        y += 48
 
         # Close button
         self._btn_close = Button((px + pw // 2 - 60, y, 120, R), "Close")
@@ -564,6 +568,17 @@ class OptionsMenu:
 
         # Reset Scenario / Close
         self._btn_reset.draw(content, font_md)
+
+        # Controls Guide
+        _sec_label(content, font_sm, "Controls Guide", content.get_width() / 2 - 50, self._tooltip_y - 10)
+        tooltip_text = [
+            "Keyboard: space for throttle, b for brake",
+            "xbox: rt for throttle, lt for brake (still binary)",
+        ]
+        for i, line in enumerate(tooltip_text):
+            lbl = font_sm.render(line, True, TEXT_DIM)
+            content.blit(lbl, lbl.get_rect(center=(content.get_width() / 2, self._tooltip_y + 15 + i * 20)))
+
         self._btn_close.draw(content, font_sm)
 
         # Blit the scrolled slice of the content surface

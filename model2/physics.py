@@ -4,7 +4,7 @@
 
 import collections
 
-from constants import M, F_ENGINE_MAX, C_RR, C_DRAG, C_BRAKING
+from constants import M, F_ENGINE_MAX, C_RR, C_DRAG, C_BRAKING, g, L, h, b, c
 
 
 class CarModel:
@@ -19,11 +19,33 @@ class CarModel:
         self.C_RR         = C_RR
         self.C_DRAG       = C_DRAG
         self.C_BRAKING    = C_BRAKING
+        self.g            = g
+        self.L            = L
+        self.h            = h
+        self.b            = b
+        self.c            = c
+
+        # Model 2 derived state (updated every step and available to renderer)
+        self.W            = self.M * self.g
+        self.dW           = 0.0
+        self.Wf_static    = (self.c / self.L) * self.W
+        self.Wr_static    = (self.b / self.L) * self.W
+        self.Wf           = self.Wf_static
+        self.Wr           = self.Wr_static
+
+    def _update_load_state(self, a):
+        self.W         = self.M * self.g
+        self.dW        = (self.h / self.L) * self.M * a
+        self.Wf_static = (self.c / self.L) * self.W
+        self.Wr_static = (self.b / self.L) * self.W
+        self.Wf        = self.Wf_static - self.dW
+        self.Wr        = self.Wr_static + self.dW
 
     def reset(self):
         """Reset kinematic state only; constants are preserved."""
         self.x = 0.0
         self.v = 0.0
+        self._update_load_state(0.0)
 
     def update(self, dt, u, B):
         """
@@ -51,7 +73,9 @@ class CarModel:
             self.v = 0.0
         self.x = self.x + dt * self.v
 
-        return a, F_engine, F_rr, F_drag, F_brake
+        self._update_load_state(a)
+
+        return a, F_engine, F_rr, F_drag, F_brake, self.Wf, self.Wr, self.dW
 
 
 class GraphBuffer:

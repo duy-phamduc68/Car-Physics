@@ -1,5 +1,5 @@
 """
-Car Physics Simulator - Model 1
+Car Physics Simulator - Model 2 (load transfer)
 ================================
 Entry point and main Simulator class.  All domain logic lives in the
 sibling modules:
@@ -32,7 +32,7 @@ class Simulator:
 
     def __init__(self):
         pygame.init()
-        pygame.display.set_caption("Car Physics Simulator - Model 1")
+        pygame.display.set_caption("Car Physics Simulator - Model 2")
 
         # Initialize with a fallback resolution, then flag it to maximize and allow resizing
         self.screen = pygame.display.set_mode(
@@ -50,7 +50,7 @@ class Simulator:
         self.dt                = 0.01
         self.target_fps        = 60
         self.graph_mode        = "full"
-        self.control_mode      = "keyboard"
+        self.control_mode      = "auto"
         self.throttle_ramp     = THROTTLE_RAMP_DEFAULT
         self.combined_channels = [True] * GraphBuffer.CHANNELS
         self.true_form         = False
@@ -205,49 +205,61 @@ class Simulator:
                     self.options.toggle()
                     continue
 
-            if self.control_mode == "keyboard":
-                if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_SPACE:
-                        self._space_held = True
-                    if event.key == pygame.K_f:
-                        self._f_held = True
-                        self.brake   = 1
-                if event.type == pygame.KEYUP:
-                    if event.key == pygame.K_SPACE:
-                        self._space_held = False
-                    if event.key == pygame.K_f:
-                        self._f_held = False
-                        self.brake   = 0
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:
+                    self._space_held = True
+                if event.key == pygame.K_f:
+                    self._f_held = True
+                    self.brake   = 1
+            if event.type == pygame.KEYUP:
+                if event.key == pygame.K_SPACE:
+                    self._space_held = False
+                if event.key == pygame.K_f:
+                    self._f_held = False
+                    self.brake   = 0
 
         return True
 
     def _update_input(self, dt):
-        if self.control_mode == "keyboard":
-            rate = 1.0 / max(self.throttle_ramp, 0.001)
-            if self._space_held:
-                self.throttle = min(1.0, self.throttle + rate * dt)
-            else:
-                self.throttle = max(0.0, self.throttle - rate * dt)
+        ctrl_throttle = 0.0
+        ctrl_brake = 0
+        controller_active = False
 
-        elif self.control_mode == "controller":
-            xi = get_xinput_state(0)
-            if xi is not None:
-                rt, b_btn, _  = xi   # start_btn handled by _poll_start_button
-                self.throttle = rt
-                self.brake    = 1 if b_btn else 0
-            elif self._joy is not None:
-                try:
-                    rt            = (self._joy.get_axis(5) + 1.0) / 2.0
-                    self.throttle = max(0.0, min(1.0, rt))
-                    self.brake    = 1 if self._joy.get_button(1) else 0
-                except Exception:
-                    pass
+        xi = get_xinput_state(0)
+        if xi is not None:
+            rt, b_btn, _ = xi   # start_btn handled by _poll_start_button
+            ctrl_throttle = max(0.0, min(1.0, rt))
+            ctrl_brake = 1 if b_btn else 0
+            controller_active = (ctrl_throttle > 0.03) or (ctrl_brake == 1)
+        elif self._joy is not None:
+            try:
+                rt = (self._joy.get_axis(5) + 1.0) / 2.0
+                ctrl_throttle = max(0.0, min(1.0, rt))
+                ctrl_brake = 1 if self._joy.get_button(1) else 0
+                controller_active = (ctrl_throttle > 0.03) or (ctrl_brake == 1)
+            except Exception:
+                pass
+
+        if controller_active:
+            self.control_mode = "controller"
+            self.throttle = ctrl_throttle
+            self.brake = ctrl_brake
+            return
+
+        # Keyboard fallback when controller is neutral/disconnected.
+        self.control_mode = "keyboard"
+        rate = 1.0 / max(self.throttle_ramp, 0.001)
+        if self._space_held:
+            self.throttle = min(1.0, self.throttle + rate * dt)
+        else:
+            self.throttle = max(0.0, self.throttle - rate * dt)
+        self.brake = 1 if self._f_held else 0
 
     # ── controller menu shortcut ──────────────────────────────────────────────
 
     def _poll_start_button(self):
         """Toggle options when Xbox Start is newly pressed (edge-detect)."""
-        if not self._xinput_ok or self.control_mode != "controller":
+        if not self._xinput_ok:
             self._start_prev = False
             return
         xi = get_xinput_state(0)
@@ -263,7 +275,7 @@ class Simulator:
     # ── physics ───────────────────────────────────────────────────────────────
 
     def _physics_step(self, dt):
-        a, F_eng, F_rr, F_drag, F_brake = self.car.update(
+        a, F_eng, F_rr, F_drag, F_brake, _wf, _wr, _dw = self.car.update(
             dt, self.throttle, self.brake)
         self.sim_time += dt
         self.graph_buf.push(self.sim_time,
@@ -287,7 +299,8 @@ class Simulator:
         draw_car(self.screen,
                  self.car_cx, self.car_wy,
                  self.car_body_w, self.car_body_h, self.car_wheel_r,
-                 self.true_form)
+                 self.true_form, self.car, self.font_sm,
+                 self.graph_rect.y)
 
     def _draw_hud(self):
         draw_hud(self.screen, self.font_sm, self.font_lg,

@@ -8,13 +8,18 @@ F_ENGINE_MAX = 3000    # N
 C_RR         = 13.0    # kg/s  (rolling resistance coefficient)
 C_DRAG       = 0.43    # kg/m  (aerodynamic drag coefficient)
 C_BRAKING    = 12000   # N
+g            = 9.81    # m/s^2
+L            = 2.8     # m  wheelbase
+h            = 0.5     # m  CG height above axle line
+b            = 1.7     # m  CG -> front axle
+c            = 1.1     # m  CG -> rear axle
 
 PIXELS_PER_METER = 100   # 1 m = 100 px
 MARKER_INTERVAL  = 25    # metres between road markers
 
 # ── Colour palette ────────────────────────────────────────────────────────────
-SKY_TOP        = (100, 160, 230)
-SKY_BOTTOM     = (180, 215, 255)
+SKY_TOP        = (83, 60, 128)
+SKY_BOTTOM     = (184, 93, 46)
 ROAD_COLOR     = (80,  80,  80)
 ROAD_LINE      = (200, 200, 200)
 MARKER_COLOR   = (255, 255, 255)
@@ -77,4 +82,19 @@ CONST_FIELDS = [
     ("C_RR",         "C_RR",         "kg/s", C_RR),
     ("C_DRAG",       "C_DRAG",       "kg/m", C_DRAG),
     ("C_BRAKING",    "C_BRAKING",    "N",    C_BRAKING),
+    ("g",            "g",            "m/s^2", g),
+    ("L",            "L",            "m",     L),
+    ("h",            "h",            "m",     h),
+    ("b",            "b",            "m",     b),
+    ("c",            "c",            "m",     c),
 ]
+
+
+# ── Editable parameter limits ─────────────────────────────────────────────────
+PARAM_LIMITS = {
+    "g": (5.0, 15.0),
+    "L": (2.0, 4.5),
+    "h": (0.2, 1.2),
+    "b": (0.5, 3.0),
+    "c": (0.5, 3.0),
+}

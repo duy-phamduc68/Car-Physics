@@ -13,7 +13,7 @@ I try to break down each model both mathematically (continuous math) and impleme
     - Straight Line Physics
     - Magic Constants
     - Braking
-- [ ] Model 2: Load Transfer Without Traction Limits (1D)
+- [x] Model 2: Load Transfer Without Traction Limits (1D)
     - Weight Transfer
 - [ ] Model 3: Engine Torque + Gearing without Slip (1D)
     - Engine Force
@@ -34,7 +34,7 @@ I try to break down each model both mathematically (continuous math) and impleme
 
 ### Model 1: Longitudinal Point Mass (1D)
 
-[Detailed Analysis](https://yuk068.github.io/2026/03/03/car-physics-model1).
+[Technical Analysis](https://yuk068.github.io/2026/03/03/car-physics-model1).
 
 ![model1-thumbnail](media/model1-thumbnail.webp)
 
@@ -68,5 +68,15 @@ I try to break down each model both mathematically (continuous math) and impleme
 **Key constraint:** the car cannot move backward in this model.
 
 ### Model 2: Load Transfer Without Traction Limits (1D)
+
+[Technical Analysis](https://yuk068.github.io/2026/03/12/car-physics-model2).
+
+![model2-thumbnail](media/model2-thumbnail.webp)
+
+**Controls**
+
+Changed to seamless detect.
+
+### Model 3: Engine Torque + Gearing without Slip (1D)
 
 Coming soon.
