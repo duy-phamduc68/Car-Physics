@@ -34,7 +34,7 @@ I try to break down each model both mathematically (continuous math) and impleme
 
 ### Model 1: Longitudinal Point Mass (1D)
 
-[Technical Analysis](https://yuk068.github.io/2026/03/03/car-physics-model1).
+[Technical Analysis](https://yuk068.github.io/2026/03/03/car-physics-model1)
 
 ![model1-thumbnail](media/model1-thumbnail.webp)
 
@@ -67,15 +67,27 @@ I try to break down each model both mathematically (continuous math) and impleme
 
 **Key constraint:** the car cannot move backward in this model.
 
+**Entry**
+
+```bash
+python model1/simulator.py
+```
+
 ### Model 2: Load Transfer Without Traction Limits (1D)
 
-[Technical Analysis](https://yuk068.github.io/2026/03/12/car-physics-model2).
+[Technical Analysis](https://yuk068.github.io/2026/03/12/car-physics-model2)
 
 ![model2-thumbnail](media/model2-thumbnail.webp)
 
 **Controls**
 
-Changed to seamless detect.
+- Changed to seamless detect.
+
+**Entry**
+
+```bash
+python model2/simulator.py
+```
 
 ### Model 3: Engine Torque + Gearing without Slip (1D)
 
