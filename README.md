@@ -15,7 +15,7 @@ I try to break down each model both mathematically (continuous math) and impleme
     - Braking
 - [x] Model 2: Load Transfer Without Traction Limits (1D)
     - Weight Transfer
-- [ ] Model 3: Engine Torque + Gearing without Slip (1D)
+- [x] Model 3: Engine Torque + Gearing without Slip (1D)
     - Engine Force
     - Gear Ratios
     - Drive Wheel Acceleration (simplified)
@@ -30,9 +30,11 @@ I try to break down each model both mathematically (continuous math) and impleme
 - [ ] Model 8: Full Coupled Tire Model (2D)
 ```
 
+Completed models:
+
 - [Model 1: Longitudinal Point Mass (1D)](#model-1-longitudinal-point-mass-1d)
 - [Model 2: Load Transfer Without Traction Limits (1D)](#model-2-load-transfer-without-traction-limits-1d)
-- [Model 3: Engine Torque + Gearing without Slip (1D)]
+- [Model 3: Engine Torque + Gearing without Slip (1D)](#model-3-engine-torque--gearing-without-slip-1d)
 - [Model 4: Wheel Rotational Dynamics (1D)]
 - [Model 5: Slip Ratio + Traction Curve (1D)]
 - [Model 6: Low-Speed Kinematic Turning (2D)]
@@ -43,7 +45,7 @@ I try to break down each model both mathematically (continuous math) and impleme
 
 ### Model 1: Longitudinal Point Mass (1D)
 
-[Technical Analysis](https://yuk068.github.io/2026/03/03/car-physics-model1)
+[Technical Breakdown](https://yuk068.github.io/2026/03/03/car-physics-model1)
 
 ![model1-thumbnail](media/model1-thumbnail.webp)
 
@@ -84,7 +86,7 @@ python model1/simulator.py
 
 ### Model 2: Load Transfer Without Traction Limits (1D)
 
-[Technical Analysis](https://yuk068.github.io/2026/03/12/car-physics-model2)
+[Technical Breakdown](https://yuk068.github.io/2026/03/12/car-physics-model2)
 
 ![model2-thumbnail](media/model2-thumbnail.webp)
 
@@ -100,4 +102,47 @@ python model2/simulator.py
 
 ### Model 3: Engine Torque + Gearing without Slip (1D)
 
-Coming soon.
+[Technical Breakdown](https://yuk068.github.io/2026/03/15/car-physics-model3)
+
+![model3-thumbnail](media/model3-thumbnail.webp)
+
+First model in the roadmap with a proper transmission engine.
+
+**Controls**
+
+- **Keyboard Layout**
+
+| Key | Action | Behavior |
+| :--- | :--- | :--- |
+| **W** | Throttle | **Simulated Analog:** 0 to 1 (1s ramp-up) |
+| **Space** | Brake | **Simulated Analog:** 0 to 1 (1s ramp-up) |
+| **A** | Gear Down | Digital / Instant |
+| **D** | Gear Up | Digital / Instant |
+| **Esc** | Options | Opens Menu |
+
+- **Xbox Controller Layout**
+
+| Control | Action | Behavior |
+| :--- | :--- | :--- |
+| **RT** (Right Trigger) | Throttle | **Native Analog:** 0.0 to 1.0 |
+| **LT** (Left Trigger) | Brake | **Native Analog:** 0.0 to 1.0 |
+| **X** Button | Gear Down | Digital / Instant |
+| **B** Button | Gear Up | Digital / Instant |
+| **Start** Button | Options | Opens Menu |
+
+**Options**
+
+- Allow toggle for **Auto Transmission / Manual Transmission**
+- Allow toggle for load transfer elements from model 2 (hide by default)
+
+**Key constraint:** wheels are "glued" to the ground.
+
+**Entry**
+
+```bash
+python model3/simulator.py
+```
+
+### Model 4: Wheel Rotational Dynamics (1D)
+
+Work in progress.
