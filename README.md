@@ -19,7 +19,7 @@ I try to break down each model both mathematically (continuous math) and impleme
     - Engine Force
     - Gear Ratios
     - Drive Wheel Acceleration (simplified)
-- [ ] Model 4: Wheel Rotational Dynamics (1D)
+- [x] Model 4: Wheel Rotational Dynamics (1D)
     - Drive Wheel Acceleration (full)
 - [ ] Model 5: Slip Ratio + Traction Curve (1D)
     - Slip Ratio & Traction Force
@@ -35,7 +35,7 @@ Completed models:
 - [Model 1: Longitudinal Point Mass (1D)](#model-1-longitudinal-point-mass-1d)
 - [Model 2: Load Transfer Without Traction Limits (1D)](#model-2-load-transfer-without-traction-limits-1d)
 - [Model 3: Engine Torque + Gearing without Slip (1D)](#model-3-engine-torque--gearing-without-slip-1d)
-- [Model 4: Wheel Rotational Dynamics (1D)]
+- [Model 4: Wheel Rotational Dynamics (1D)](#model-4-wheel-rotational-dynamics-1d)
 - [Model 5: Slip Ratio + Traction Curve (1D)]
 - [Model 6: Low-Speed Kinematic Turning (2D)]
 - [Model 7: High-Speed Lateral Tire Model (2D)]
@@ -145,4 +145,12 @@ python model3/simulator.py
 
 ### Model 4: Wheel Rotational Dynamics (1D)
 
-Work in progress.
+[Technical Breakdown](https://yuk068.github.io/2026/03/21/car-physics-model4)
+
+![model4-thumbnail](media/model4-thumbnail.webp)
+
+**Entry**
+
+```bash
+python model4/simulator.py
+```

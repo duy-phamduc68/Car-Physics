@@ -4,9 +4,10 @@
 
 # ── Physics defaults ──────────────────────────────────────────────────────────
 M         = 1500    # kg
+I_W       = 3.0     # kg·m^2 (Rotational Inertia of Drive Wheels)
 C_RR      = 13.0    # rolling resistance coefficient
 C_DRAG    = 0.43    # aerodynamic drag coefficient
-C_BRAKING = 12000   # N
+C_BRAKE_TORQUE = 4500.0 # N·m (Max clamping torque of brakes)
 MU        = 1.0     # tire friction coefficient placeholder
 g         = 9.81    # m/s^2
 L         = 2.8     # m  wheelbase
@@ -17,7 +18,7 @@ c         = 1.1     # m  CG -> rear axle
 PIXELS_PER_METER = 100   # 1 m = 100 px
 MARKER_INTERVAL  = 25    # metres between road markers
 
-# —— Drivetrain constants (Model 3) —————————————————————————————————
+# —— Drivetrain constants (Model 4) —————————————————————————————————
 R_W         = 0.33    # m (wheel radius)
 FINAL_DRIVE = 3.42    # differential ratio
 ETA         = 0.7     # drivetrain efficiency
@@ -164,8 +165,8 @@ def torque_curve_to_str(curve):
 
 # ── Colour palette ────────────────────────────────────────────────────────────
 SKY_TOP        = (8, 18, 46)
-SKY_BOTTOM     = (20, 42, 84)
-ROAD_COLOR     = (80,  80,  80)
+SKY_BOTTOM     = (20, 84, 78)
+ROAD_COLOR     = (50,  50,  50)
 ROAD_LINE      = (200, 200, 200)
 MARKER_COLOR   = (255, 255, 255)
 CAR_BODY       = (230, 110,  20)
@@ -181,30 +182,45 @@ OVERLAY_BG     = (15,  15,  20, 210)
 PANEL_BG       = (25,  28,  38, 240)
 TEXT_BRIGHT    = (230, 235, 255)
 TEXT_DIM       = (140, 145, 165)
-ACCENT         = (81, 139, 255)
+ACCENT         = (4, 143, 0)
 ACCENT2        = (255, 140,  50)
 BTN_NORMAL     = (45,  50,  68)
 BTN_HOVER      = (65,  72,  96)
-BTN_ACTIVE     = (83, 130, 255)
+BTN_ACTIVE     = (0, 199, 168)
 
 GRAPH_COLORS = [
-    (100, 220, 100),   # velocity      - green
-    (255, 180,  60),   # acceleration  - orange
-    ( 80, 180, 255),   # position      - blue
-    (255, 100, 100),   # engine force  - red
-    (180, 100, 255),   # drag force    - purple
-    (255, 220,  80),   # rolling res   - yellow
-    (255,  80, 140),   # braking force - pink
+    (100, 220, 100),   # 0: velocity      - green
+    (255, 180,  60),   # 1: acceleration  - orange
+    ( 80, 180, 255),   # 2: position      - blue
+    (255, 100, 100),   # 3: F_traction* - red
+    (180, 100, 255),   # 4: F_drag        - purple
+    (255, 220,  80),   # 5: F_rr          - yellow
+    (200, 200, 200),   # 6: Net Force     - white/grey
+    
+    (100, 255, 200),   # 7: Wheel w       - cyan
+    (255, 200,  80),   # 8: Wheel alpha   - gold
+    (100, 100, 100),   # 9: Slip Ratio    - GRAYED OUT
+    (255, 100, 100),   # 10: T_drive      - red
+    (255,  80, 140),   # 11: T_brake      - pink
+    (180, 100, 255),   # 12: T_traction* - purple
+    (200, 200, 200),   # 13: Net Torque* - white/grey
 ]
 
 GRAPH_LABELS = [
     "Velocity (m/s)",
     "Accel (m/s²)",
     "Position (m)",
-    "Engine Force (N)",
+    "F_traction* (N)",
     "Drag Force (N)",
     "Rolling Res. (N)",
-    "Braking Force (N)",
+    "Net Force (N)",
+    "Wheel \u03C9 (rad/s)",
+    "Wheel \u03B1 (rad/s²)",
+    "Slip Ratio \u03C3 (INACTIVE)", 
+    "Drive Torque (N·m)",
+    "Brake Torque (N·m)",
+    "T_traction* (N·m)",
+    "Net Torque* (N·m)",
 ]
 
 # ── Simulation option tables ──────────────────────────────────────────────────
@@ -229,7 +245,7 @@ CONST_FIELDS = [
     ("c", "c", "m", c),
     ("Rolling Resistance", "C_RR", "coef", C_RR),
     ("Aerodynamic Drag", "C_DRAG", "coef", C_DRAG),
-    ("Brake Force", "C_BRAKING", "N", C_BRAKING),
+    ("Brake Force", "C_BRAKE_TORQUE", "N", C_BRAKE_TORQUE),
     
     ("Final Drive Ratio", "FINAL_DRIVE", "ratio", FINAL_DRIVE),
     ("Wheel Radius", "R_W", "m", R_W),
@@ -274,7 +290,7 @@ CONST_SECTIONS = [
         [
             ("Rolling Resistance", "C_RR", "coef", C_RR),
             ("Aerodynamic Drag", "C_DRAG", "coef", C_DRAG),
-            ("Brake Force", "C_BRAKING", "N", C_BRAKING),
+            ("Brake Force", "C_BRAKE_TORQUE", "N", C_BRAKE_TORQUE),
         ],
     ),
     (
@@ -296,7 +312,7 @@ PARAM_LIMITS = {
     "M": (500.0, 5000.0),
     "C_RR": (0.0, 80.0),
     "C_DRAG": (0.0, 2.5),
-    "C_BRAKING": (1000.0, 30000.0),
+    "C_BRAKE_TORQUE": (1000.0, 30000.0),
     # MU removed from editable limits (not editable in UI)
     "FINAL_DRIVE": (1.0, 8.0),
     "R_W": (0.15, 0.6),

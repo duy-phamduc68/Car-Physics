@@ -36,11 +36,11 @@ OVERLAY_BG     = (15,  15,  20, 210)
 PANEL_BG       = (25,  28,  38, 240)
 TEXT_BRIGHT    = (230, 235, 255)
 TEXT_DIM       = (140, 145, 165)
-ACCENT         = (80,  170, 255)
+ACCENT         = (255, 140,  50)
 ACCENT2        = (255, 140,  50)
 BTN_NORMAL     = (45,  50,  68)
 BTN_HOVER      = (65,  72,  96)
-BTN_ACTIVE     = (80, 170, 255)
+BTN_ACTIVE     = (214, 165, 127)
 
 GRAPH_COLORS = [
     (100, 220, 100),   # velocity      - green
